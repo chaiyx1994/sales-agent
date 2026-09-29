@@ -1,0 +1,87 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: ernest-sales-agent
+  main:
+    web-application-type: servlet   # 同时引了 webflux 时强制使用 servlet 模式，避免 actuator 端点映射异常
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+  # 数据库（H2 内存库，MySQL 兼容模式）
+  datasource:
+    url: jdbc:h2:mem:ernestdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  # SQL 初始化（建表 + 测试数据，IF NOT EXISTS + INSERT IGNORE 安全重复执行）
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+
+  # JPA
+  jpa:
+    hibernate:
+      ddl-auto: none            # 使用 schema.sql 建表，不用 JPA 自动建表
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+    defer-datasource-initialization: true  # 等 JPA 初始化后再执行 SQL 脚本
+
+# LangChain4j OpenAI 兼容接口 → DashScope
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: ${DASHSCOPE_API_KEY:}
+      model-name: qwen-max
+      temperature: 0.1          # 数据分析场景用低温度，减少随机性
+      max-tokens: 2048
+    streaming-chat-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: ${DASHSCOPE_API_KEY:}
+      model-name: qwen-max
+      temperature: 0.1
+      max-tokens: 2048
+
+# Sa-Token 配置（轻量权限框架）
+sa-token:
+  token-name: Authorization
+  timeout: 86400
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-log: false
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+  endpoint:
+    health:
+      show-details: always
+
+# 应用自定义配置
+sales-agent:
+  tool:
+    anomaly-threshold-days: 5
+    trend-drop-threshold: 0.3
+
+logging:
+  level:
+    com.ernest.salesAgent: DEBUG
+    dev.langchain4j: INFO
+app:
+  auth:
+    enabled: false
